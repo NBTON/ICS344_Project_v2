@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureChat</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="user-profile">
+                <h3>My Profile</h3>
+                <div id="currentUser">Loading...</div>
+                <button id="logoutBtn">Logout</button>
+            </div>
+            <div class="user-list-container">
+                <h3>Contacts</h3>
+                <ul id="userList" class="user-list">
+                    <!-- Users will be loaded here -->
+                </ul>
+            </div>
+            <div class="nav-links">
+                <a href="/key-management">Key Management</a>
+                <a href="/attack-lab">Attack Lab</a>
+            </div>
+        </aside>
+
+        <main class="chat-area">
+            <div id="chatHeader" class="chat-header">
+                <h3>Select a contact to start chatting</h3>
+            </div>
+
+            <div id="messageContainer" class="message-container">
+                <!-- Messages will appear here -->
+            </div>
+
+            <div class="message-input-area">
+                <form id="messageForm">
+                    <input type="text" id="messageInput" placeholder="Type a message..." disabled>
+                    <button type="submit" id="sendBtn" disabled>Send</button>
+                </form>
+            </div>
+        </main>
+    </div>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

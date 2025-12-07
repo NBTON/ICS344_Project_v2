@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SecureChat - Key Management</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="user-profile">
+                <h3>Key Management</h3>
+                <a href="/">Back to Chat</a>
+            </div>
+        </aside>
+
+        <main class="chat-area">
+            <div class="container" style="max-width: 800px;">
+                <h2>Your Encryption Keys</h2>
+
+                <div class="key-info">
+                    <p><strong>Public Key Fingerprint (SHA-256):</strong></p>
+                    <code id="fingerprint">Loading...</code>
+
+                    <p><strong>Key Size:</strong> 3072 bits</p>
+                    <p><strong>Algorithm:</strong> RSA-PSS / RSA-OAEP</p>
+                </div>
+
+                <div class="key-actions">
+                    <h3>Actions</h3>
+                    <!-- Rotation not fully implemented in backend yet, but button exists -->
+                    <button id="rotateBtn" disabled title="Coming soon">Rotate Keys</button>
+                    <button id="exportBtn" onclick="exportKeys()">Export Keys</button>
+                </div>
+
+                <div class="public-key-display">
+                    <h3>Your Public Key</h3>
+                    <pre id="publicKey" style="background: #f0f0f0; padding: 10px; overflow-x: auto;">Loading...</pre>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const userId = localStorage.getItem('user_id');
+            if (!userId) {
+                 window.location.href = '/login.html';
+                 return;
+            }
+
+            try {
+                const res = await fetch(`/api/users/${userId}/key`);
+                if (!res.ok) throw new Error('Failed to fetch key');
+
+                const data = await res.json();
+                document.getElementById('fingerprint').innerText = data.fingerprint;
+                document.getElementById('publicKey').innerText = data.public_key;
+
+            } catch (e) {
+                console.error(e);
+                alert('Error loading key info');
+            }
+        });
+
+        function exportKeys() {
+            alert("Export functionality requires backend endpoint implementation.");
+        }
+    </script>
+</body>
+</html>

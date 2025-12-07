@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SecureChat - Attack Lab</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        .attack-dashboard {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+            padding: 20px;
+        }
+        .controls {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .logs {
+            background: #1e1e1e;
+            color: #0f0;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: monospace;
+            height: 500px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin-bottom: 10px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+        }
+        .blocked { color: #0f0; }
+        .success { color: #f00; }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="user-profile">
+                <h3>Attack Lab</h3>
+                <a href="/">Back to Chat</a>
+            </div>
+        </aside>
+
+        <main class="chat-area">
+            <div class="attack-dashboard">
+                <div class="controls">
+                    <h2>Attack Simulator</h2>
+
+                    <div class="form-group">
+                        <h3>1. Replay Attack</h3>
+                        <p>Attempt to resend a captured encrypted message.</p>
+                        <button onclick="runAttack('replay')">Run Replay Attack</button>
+                    </div>
+
+                    <div class="form-group">
+                        <h3>2. Ciphertext Tampering</h3>
+                        <p>Modify bits in the encrypted payload.</p>
+                        <button onclick="runAttack('tamper')">Run Tamper Attack</button>
+                    </div>
+
+                    <div class="form-group">
+                        <h3>3. Man-in-the-Middle (MITM)</h3>
+                        <p>Attempt to sign message with fake key.</p>
+                        <button onclick="runAttack('mitm')">Run MITM Attack</button>
+                    </div>
+
+                    <div class="form-group">
+                        <h3>4. Denial of Service (DoS)</h3>
+                        <p>Simulate request flooding.</p>
+                        <button onclick="runAttack('dos')">Run DoS Attack</button>
+                    </div>
+
+                </div>
+
+                <div class="logs" id="attackLogs">
+                    <div>Waiting for attack logs...</div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        async function runAttack(type) {
+            try {
+                const res = await fetch(`/api/attack-lab/${type}`, { method: 'POST' });
+                const data = await res.json();
+                alert(JSON.stringify(data, null, 2));
+                loadLogs();
+            } catch (e) {
+                alert('Error running attack');
+            }
+        }
+
+        async function loadLogs() {
+            try {
+                const res = await fetch('/api/attack-lab/logs');
+                const logs = await res.json();
+
+                const container = document.getElementById('attackLogs');
+                container.innerHTML = '';
+
+                logs.forEach(log => {
+                    const div = document.createElement('div');
+                    div.className = 'log-entry';
+                    div.innerHTML = `
+                        [${log.timestamp}] <strong>${log.attack_type}</strong><br>
+                        Data: ${log.attack_type === 'Replay Attack' ? 'Replaying old message' : 'Bit flipping ciphertext'}<br>
+                        Result: <span class="${log.blocked ? 'blocked' : 'success'}">${log.blocked ? 'BLOCKED' : 'SUCCESS'}</span><br>
+                        Defense: ${log.defense_triggered}
+                    `;
+                    container.appendChild(div);
+                });
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // Initial load
+        loadLogs();
+        setInterval(loadLogs, 5000);
+    </script>
+</body>
+</html>

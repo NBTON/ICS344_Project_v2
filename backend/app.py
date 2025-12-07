@@ -8,6 +8,9 @@ def create_app(config_class=Config):
 
     db.init_app(app)
 
+    with app.app_context():
+        db.create_all()
+
     # Register extensions and blueprints
     from backend.websocket_handler import register_extensions
     register_extensions(app)

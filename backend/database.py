@@ -34,6 +34,7 @@ class Messages(db.Model):
     sender_id = db.Column(db.String(36), db.ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
     recipient_id = db.Column(db.String(36), db.ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
     encrypted_session_key = db.Column(db.Text, nullable=False)
+    sender_encrypted_session_key = db.Column(db.Text, nullable=True)  # Session key encrypted for sender
     iv = db.Column(db.Text, nullable=False)
     ciphertext = db.Column(db.Text, nullable=False)
     tag = db.Column(db.Text, nullable=False)

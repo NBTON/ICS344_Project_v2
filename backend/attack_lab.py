@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, session
 from backend.database import db, Messages, AttackLogs, Users
 from backend.message_handler import MessageHandler
 from backend.auth import login_required
+from backend.utils import rate_limit
 import uuid
 from datetime import datetime
 import base64
@@ -198,22 +199,97 @@ def simulate_mitm_attack():
 
 @attack_bp.route('/api/attack-lab/dos', methods=['POST'])
 @login_required
+@rate_limit(max_requests=10, window_seconds=60)  # Strict limit for demo
 def simulate_dos_attack():
-    # Simulate flooding
-    # We will just log it and simulate the rate limiter response
-
+    """
+    Simulates a DoS attack scenario.
+    This endpoint is rate-limited to demonstrate the defense mechanism.
+    If you call this endpoint more than 10 times in 60 seconds, you'll be blocked.
+    """
     log = AttackLogs(
         attack_type='DoS Attack',
         attacker_ip=request.remote_addr,
-        attack_data="Simulating 1000 requests/sec",
-        blocked=True,
-        defense_triggered="Rate Limiting (Simulated)"
+        attack_data="Request accepted - Rate limit not yet exceeded",
+        blocked=False,
+        defense_triggered="Rate Limiting (Active)"
     )
-
-    # In a real scenario, we'd use the RateLimits model to check.
-    # For simulation, we just confirm we HAVE the mechanism.
 
     db.session.add(log)
     db.session.commit()
 
-    return jsonify({'message': 'Attack blocked', 'defense': 'Rate Limiting triggered after 100 requests'}), 200
+    return jsonify({
+        'message': 'Request processed',
+        'note': 'Rate limiting is active. Try calling this endpoint more than 10 times in 60 seconds to see it blocked.',
+        'requests_info': 'After exceeding the limit, you will receive HTTP 429 (Too Many Requests)'
+    }), 200
+
+
+@attack_bp.route('/api/attack-lab/dos-flood', methods=['POST'])
+@login_required
+def simulate_dos_flood():
+    """
+    Simulates rapid flooding by making multiple internal requests.
+    This demonstrates the rate limiter blocking excessive requests.
+    """
+    blocked_count = 0
+    success_count = 0
+    
+    from backend.utils import rate_limit
+    from backend.database import RateLimits
+    
+    # Simulate 15 rapid requests to trigger rate limiting
+    for i in range(15):
+        # Check rate limit directly
+        from datetime import timedelta
+        
+        ip_address = request.remote_addr
+        endpoint = 'attack.simulate_dos_flood_internal'
+        now = datetime.utcnow()
+        window_start = now - timedelta(seconds=60)
+        
+        rate_record = RateLimits.query.filter_by(
+            ip_address=ip_address,
+            endpoint=endpoint
+        ).first()
+        
+        if rate_record:
+            if rate_record.window_start < window_start:
+                rate_record.request_count = 1
+                rate_record.window_start = now
+                success_count += 1
+            else:
+                rate_record.request_count += 1
+                if rate_record.request_count > 10:
+                    blocked_count += 1
+                else:
+                    success_count += 1
+        else:
+            rate_record = RateLimits(
+                ip_address=ip_address,
+                endpoint=endpoint,
+                request_count=1,
+                window_start=now
+            )
+            db.session.add(rate_record)
+            success_count += 1
+        
+        db.session.commit()
+    
+    log = AttackLogs(
+        attack_type='DoS Attack',
+        attacker_ip=request.remote_addr,
+        attack_data=f"Simulated 15 rapid requests: {success_count} allowed, {blocked_count} blocked",
+        blocked=blocked_count > 0,
+        defense_triggered=f"Rate Limiting - Blocked {blocked_count}/15 requests"
+    )
+    
+    db.session.add(log)
+    db.session.commit()
+
+    return jsonify({
+        'message': 'DoS simulation complete',
+        'total_requests': 15,
+        'allowed': success_count,
+        'blocked': blocked_count,
+        'defense': 'Rate Limiting'
+    }), 200

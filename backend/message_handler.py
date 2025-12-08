@@ -37,6 +37,10 @@ class MessageHandler:
         if not recipient:
             raise ValueError("Recipient not found")
 
+        sender = Users.query.get(sender_id)
+        if not sender:
+            raise ValueError("Sender not found")
+
         # 1. Generate session key and IV
         session_key = secrets.token_bytes(32)
 
@@ -53,6 +57,9 @@ class MessageHandler:
         # 3. Encrypt session key with recipient's public key
         encrypted_session_key = rsa_oaep_encrypt(recipient.public_key.encode('utf-8'), session_key)
 
+        # 3b. Also encrypt session key for sender (so they can read their own messages)
+        sender_encrypted_session_key = rsa_oaep_encrypt(sender.public_key.encode('utf-8'), session_key)
+
         # 4. Prepare metadata
         message_id = str(uuid.uuid4())
         timestamp = datetime.utcnow()
@@ -65,6 +72,7 @@ class MessageHandler:
 
         # Convert bytes to base64 for storage/signing
         b64_enc_key = base64.b64encode(encrypted_session_key).decode('utf-8')
+        b64_sender_enc_key = base64.b64encode(sender_encrypted_session_key).decode('utf-8')
         b64_iv = base64.b64encode(iv).decode('utf-8')
         b64_ciphertext = base64.b64encode(ciphertext).decode('utf-8')
         b64_tag = base64.b64encode(tag).decode('utf-8')
@@ -94,6 +102,7 @@ class MessageHandler:
             sender_id=sender_id,
             recipient_id=recipient_id,
             encrypted_session_key=b64_enc_key,
+            sender_encrypted_session_key=b64_sender_enc_key,
             iv=b64_iv,
             ciphertext=b64_ciphertext,
             tag=b64_tag,
@@ -169,3 +178,59 @@ class MessageHandler:
             return plaintext.decode('utf-8')
         except Exception as e:
             raise ValueError(f"Message decryption failed: {e}")
+
+    @staticmethod
+    def decrypt_message_as_sender(sender_private_key_pem, message):
+        """
+        Decrypts a message object for the sender (who sent it).
+        Uses the sender_encrypted_session_key field.
+        Args:
+            sender_private_key_pem (str): Sender's private key.
+            message (Messages): The message object from DB.
+        Returns:
+            str: Decrypted plaintext or raises Exception.
+        """
+        # Check if sender_encrypted_session_key exists
+        if not message.sender_encrypted_session_key:
+            raise ValueError("Sender session key not available for this message")
+
+        # 1. Verify Signature (same as recipient)
+        sender = Users.query.get(message.sender_id)
+        if not sender:
+            raise ValueError("Sender not found")
+
+        payload_dict = {
+            "message_id": message.message_id,
+            "sender_id": message.sender_id,
+            "recipient_id": message.recipient_id,
+            "timestamp": message.timestamp.isoformat(),
+            "sequence_number": message.sequence_number,
+            "encrypted_session_key": message.encrypted_session_key,
+            "iv": message.iv,
+            "ciphertext": message.ciphertext,
+            "tag": message.tag
+        }
+        payload_str = json.dumps(payload_dict, sort_keys=True)
+        signature = base64.b64decode(message.signature)
+
+        if not rsa_pss_verify(sender.public_key.encode('utf-8'), payload_str.encode('utf-8'), signature):
+            raise ValueError("Signature verification failed! Message integrity compromised.")
+
+        # 2. Decrypt Session Key using sender's encrypted copy
+        try:
+            encrypted_session_key = base64.b64decode(message.sender_encrypted_session_key)
+            session_key = rsa_oaep_decrypt(sender_private_key_pem.encode('utf-8'), encrypted_session_key)
+        except Exception as e:
+            raise ValueError(f"Session key decryption failed: {e}")
+
+        # 3. Decrypt Ciphertext
+        try:
+            iv = base64.b64decode(message.iv)
+            ciphertext = base64.b64decode(message.ciphertext)
+            tag = base64.b64decode(message.tag)
+
+            plaintext = aes_gcm_decrypt(session_key, iv, ciphertext, tag)
+            return plaintext.decode('utf-8')
+        except Exception as e:
+            raise ValueError(f"Message decryption failed: {e}")
+

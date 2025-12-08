@@ -47,23 +47,24 @@ def send_message():
     try:
         msg = MessageHandler.send_message(sender_id, private_key_pem, recipient_id, plaintext)
 
-        # Emit WebSocket event
+        # Emit WebSocket event - SECURITY FIX: Don't send plaintext, only notification
         # Import inside function to avoid circular import
         from backend.websocket_handler import socketio
 
+        # Notify recipient that a new message is available (no plaintext)
         socketio.emit('new_message', {
             'message_id': msg.message_id,
             'sender_id': msg.sender_id,
             'recipient_id': msg.recipient_id,
-            'timestamp': msg.timestamp.isoformat(),
-            'content': plaintext
+            'timestamp': msg.timestamp.isoformat()
         }, room=recipient_id)
 
-        # Send confirmation to sender
+        # Send confirmation to sender (include plaintext for immediate display only)
         socketio.emit('message_sent', {
              'message_id': msg.message_id,
              'recipient_id': recipient_id,
-             'content': plaintext
+             'content': plaintext,  # OK to send to sender (they already know it)
+             'timestamp': msg.timestamp.isoformat()
         }, room=sender_id)
 
         return jsonify({'message': 'Message sent successfully', 'message_id': msg.message_id}), 201
@@ -93,24 +94,13 @@ def get_messages(partner_id):
             is_sender = (msg.sender_id == user_id)
             content = ""
 
-            # If I am the sender, I should have stored the plaintext or encrypted it for myself too?
-            # Wait, the current implementation only encrypts for the recipient!
-            # If I am the sender, I cannot decrypt the message unless I encrypted the session key for myself too.
-            # The plan says: "Encrypt session key with recipient's public key... Store encrypted message".
-            # It does NOT mention encrypting for the sender.
-            # This is a common pitfall. Usually, you encrypt for both (multi-recipient) or store plaintext locally.
-            # But in a web app, "store locally" means browser storage.
-            # If I fetch history from server, and I am the sender, I can't decrypt it.
-
-            # For the purpose of this project, if I am the sender, I might just return "Encrypted Message"
-            # OR I should have encrypted it for myself.
-            # Given the plan's strict instructions, I followed the "Recipient" encryption.
-            # Let's see if I can decrypt it.
-
             if is_sender:
-                # I cannot decrypt it because I don't have the session key encrypted with MY public key.
-                # Unless I modify send_message to add support for sender decryption.
-                content = "[Encrypted message sent]"
+                # Use sender's encrypted session key to decrypt
+                try:
+                    content = MessageHandler.decrypt_message_as_sender(private_key_pem, msg)
+                except ValueError:
+                    # Fallback for old messages without sender_encrypted_session_key
+                    content = "[Encrypted message - sent before update]"
             else:
                 content = MessageHandler.decrypt_message(private_key_pem, msg)
 

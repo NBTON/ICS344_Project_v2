@@ -2,7 +2,6 @@
 
 **Technical Report**
 
-**Author:** [Author Name]
 **Date:** December 7, 2025
 **Course:** ICS344 - Network Security
 **Institution:** King Fahd University of Petroleum and Minerals

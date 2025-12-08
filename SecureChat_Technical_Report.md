@@ -2,10 +2,14 @@
 
 **Technical Report**
 
-**Author:** [Author Name]  
-**Date:** December 7, 2025  
-**Course:** ICS344 - Network Security  
-**Institution:** King Fahd University of Petroleum and Minerals  
+**Author:** [Author Name]
+**Date:** December 7, 2025
+**Course:** ICS344 - Network Security
+**Institution:** King Fahd University of Petroleum and Minerals
+
+👥 **Group Members**
+- Member 1: Ali Asiri (202027780) — 4
+- Member 2: Omar alshahrani (202040640) — 4
 
 ---
 
